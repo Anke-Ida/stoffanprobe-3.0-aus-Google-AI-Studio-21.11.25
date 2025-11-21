@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -14,3 +13,16 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+// --- Service Worker Registrierung ---
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(registration => {
+        console.log('SW registered with scope:', registration.scope);
+      })
+      .catch(err => {
+        console.log('SW registration failed:', err);
+      });
+  });
+}
