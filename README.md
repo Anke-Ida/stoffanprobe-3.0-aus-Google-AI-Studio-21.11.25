@@ -1,0 +1,1 @@
+# stoffanprobe-3.0-aus-Google-AI-Studio-21.11.25
