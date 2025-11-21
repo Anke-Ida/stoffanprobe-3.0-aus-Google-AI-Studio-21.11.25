@@ -148,7 +148,6 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setShowNextStep(false);
 
     try {
-        // 1. Prompt Bauen für Flux / Fal.ai
         let prompt = "Ein fotorealistisches Bild eines Innenraums. ";
         
         if (visualizationMode === 'pattern' && selectedPreset) {
@@ -165,14 +164,12 @@ const Workspace: React.FC<WorkspaceProps> = ({
         
         prompt += "Hohe Qualität, 4k, Architekturfotografie.";
 
-        // 2. Aufruf des neuen AIService (Fal.ai)
         const result = await AIService.generateImage(
             prompt,
             session.originalImage,
-            session.originalImage // Hier nutzen wir vorerst das Originalbild als Referenz für die Maske (automatisches Inpainting)
+            session.originalImage 
         );
         
-        // Fal.ai gibt eine Liste von Bildern zurück
         const newVariantImage = result.images && result.images.length > 0 ? result.images[0].url : null;
 
         if (!newVariantImage) {
@@ -240,9 +237,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
   const handleDownloadGallery = async () => {
       if (!session || session.variants.length === 0) return;
-
       setIsLoading(true);
-
       try {
           const zip = new JSZip();
           const folderName = `stoffanprobe-${session.name.replace(/\s/g, '_') || new Date().toISOString().split('T')[0]}`;
@@ -250,10 +245,8 @@ const Workspace: React.FC<WorkspaceProps> = ({
           if (!folder) throw new Error("Konnte keinen ZIP-Ordner erstellen.");
 
           for (const variant of session.variants) {
-              // Fal.ai URLs sind normale Links, wir müssen sie fetchen um sie zu zippen
               const response = await fetch(variant.imageUrl);
               const blob = await response.blob();
-              
               const extension = blob.type.split('/')[1] || 'png';
               const filename = `variante-${variant.preset}-${variant.id.substring(0, 4)}.${extension}`;
               folder.file(filename, blob);
@@ -305,13 +298,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
   return (
     <>
       {isLoading && <LoadingOverlay />}
-      
       <ConsentModal 
         isOpen={consentState.isOpen}
         onClose={() => setConsentState({isOpen: false, tempImageDataUrl: null})}
         onConfirm={handleConsentConfirm}
       />
-      
       <main className={`flex-grow container mx-auto p-4 md:p-6 lg:p-8 transition-opacity duration-300 ${isLoading ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
         <div className="text-center mb-8">
             <h1 className="text-3xl sm:text-4xl font-bold text-[#532418] mb-2">KI Visualisierung</h1>
@@ -320,10 +311,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
 
         {!session && (
           <div className="text-center mb-8">
-            <button
-              onClick={onShowSessions}
-              className={glassButton}
-            >
+            <button onClick={onShowSessions} className={glassButton}>
               Sitzung fortsetzen
             </button>
           </div>
@@ -341,45 +329,24 @@ const Workspace: React.FC<WorkspaceProps> = ({
                   description="Aufnehmen oder hochladen"
                   buttonText="Eigenes Raumfoto auswählen"
                 />
-                
                 {session?.wallColor ? (
                    <div className="w-full flex flex-col gap-4 p-4 rounded-3xl bg-white/10">
                       <div className={`p-4 flex items-center gap-4 ${glassBase} rounded-xl`}>
-                          <div
-                            className="w-12 h-12 rounded-md border-2 border-white/50 shadow"
-                            style={{ backgroundColor: session.wallColor.hex }}
-                          />
+                          <div className="w-12 h-12 rounded-md border-2 border-white/50 shadow" style={{ backgroundColor: session.wallColor.hex }} />
                           <div className="flex-grow">
                             <p className="font-semibold text-[#532418]">{session.wallColor.code}</p>
                             <p className="text-sm text-gray-700">{session.wallColor.name}</p>
                           </div>
-                       
                           <div className="flex items-center gap-4">
-                             <button
-                              className="text-sm font-medium text-[#532418] hover:text-[#FF954F] flex items-center gap-1 transition-colors"
-                              onClick={handleSelectWallColor}
-                              aria-label="Wandfarbe ändern"
-                            >
+                             <button className="text-sm font-medium text-[#532418] hover:text-[#FF954F] flex items-center gap-1 transition-colors" onClick={handleSelectWallColor}>
                               <PencilIcon /> Ändern
                             </button>
-                            <button
-                              className="text-sm font-medium text-red-600 hover:text-red-800 flex items-center gap-1 transition-colors"
-                              onClick={() => {
-                                  updateSession((prev) => ({ ...prev, wallColor: undefined }));
-                                  setVisualizationMode(null);
-                              }}
-                              aria-label="Wandfarbe entfernen"
-                            >
+                            <button className="text-sm font-medium text-red-600 hover:text-red-800 flex items-center gap-1 transition-colors" onClick={() => { updateSession((prev) => ({ ...prev, wallColor: undefined })); setVisualizationMode(null); }}>
                               <DiscardIcon className="h-4 w-4" />
                             </button>
                           </div>
                       </div>
-
-                      <p className="text-sm text-[#532418]/70 italic mt-2">
-                        Optional: Hinweis zur Farbplatzierung
-                        (z.B. „nur linke Wand“, „Fensterrahmen“)
-                      </p>
-
+                      <p className="text-sm text-[#532418]/70 italic mt-2">Optional: Hinweis zur Farbplatzierung (z.B. „nur linke Wand“, „Fensterrahmen“)</p>
                       <form onSubmit={handleFormSubmit} className="relative">
                           <div className="flex items-start gap-3">
                               <textarea
@@ -387,66 +354,31 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                   placeholder={isListening ? "🎙️ Aufnahme läuft..." : "Hinweis tippen oder sprechen..."}
                                   value={textHint}
                                   onChange={(e) => setTextHint(e.target.value)}
-                                  onKeyDown={(e) => {
-                                      if (e.key === 'Enter' && !e.shiftKey) {
-                                          e.preventDefault();
-                                          if (isGenerationEnabled) {
-                                              handleGenerate();
-                                          }
-                                      }
-                                  }}
+                                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (isGenerationEnabled) { handleGenerate(); }}}}
                                   className="w-full h-24 rounded-xl border border-gray-300 p-3 text-sm focus:ring-2 focus:ring-[#FF954F] focus:border-[#FF954F] transition-shadow resize-none flex-grow"
                               />
-                              {isSpeechRecognitionSupported && (
-                                <SpeechButton 
-                                    onStart={startSpeechToText}
-                                    onStop={stopSpeechToText}
-                                    isListening={isListening}
-                                />
-                              )}
+                              {isSpeechRecognitionSupported && (<SpeechButton onStart={startSpeechToText} onStop={stopSpeechToText} isListening={isListening} />)}
                           </div>
-                          {isListening && (
-                                <p className="text-sm text-gray-600 italic mt-2 h-5">
-                                    Zuhören aktiv...
-                                </p>
-                          )}
+                          {isListening && (<p className="text-sm text-gray-600 italic mt-2 h-5">Zuhören aktiv...</p>)}
                       </form>
-                      
-                      <button
-                          onClick={handleGenerate} 
-                          disabled={!isGenerationEnabled || isLoading}
-                          className={`${actionButtonClasses} w-full text-lg bg-[#FF954F] hover:bg-[#CC5200] focus:ring-[#FF954F] disabled:bg-[#C8B6A6] disabled:cursor-not-allowed mt-4`}
-                      >
+                      <button onClick={handleGenerate} disabled={!isGenerationEnabled || isLoading} className={`${actionButtonClasses} w-full text-lg bg-[#FF954F] hover:bg-[#CC5200] focus:ring-[#FF954F] disabled:bg-[#C8B6A6] disabled:cursor-not-allowed mt-4`}>
                           Bild generieren
                       </button>
                    </div>
                 ) : (
-                  <ImageUploader 
-                    onImageSelect={handlePatternImageUpload}
-                    imageDataUrl={session?.patternImage}
-                    title="2. Muster-/Objektfoto"
-                    description="Aufnehmen oder hochladen"
-                    buttonText="Musterfoto auswählen"
-                  />
+                  <ImageUploader onImageSelect={handlePatternImageUpload} imageDataUrl={session?.patternImage} title="2. Muster-/Objektfoto" description="Aufnehmen oder hochladen" buttonText="Musterfoto auswählen" />
                 )}
             </div>
         </div>
 
         {showPatternControls && (
             <section className="mt-12 animate-fade-in">
-                <div className="text-center mb-6">
-                    <h2 className="text-2xl font-semibold text-[#532418]">3. Wähle, was du gestalten möchtest</h2>
-                </div>
-                
+                <div className="text-center mb-6"><h2 className="text-2xl font-semibold text-[#532418]">3. Wähle, was du gestalten möchtest</h2></div>
                 <div className="flex flex-col items-center gap-6 w-full max-w-4xl mx-auto">
-                    
                     <div className="w-full text-center">
                         <p className="text-md text-[#67534F]/90 mb-4">Wähle einen Bereich für das Muster aus:</p>
-                        <div className="flex flex-wrap justify-center items-start gap-4 w-full">
-                            <PresetButtons selectedPreset={selectedPreset} onPresetSelect={setSelectedPreset} />
-                        </div>
+                        <div className="flex flex-wrap justify-center items-start gap-4 w-full"><PresetButtons selectedPreset={selectedPreset} onPresetSelect={setSelectedPreset} /></div>
                     </div>
-                    
                     <div className="flex flex-col items-center gap-4 w-full max-w-2xl">
                         <div className="w-full">
                             <form onSubmit={handleFormSubmit} className="relative">
@@ -456,38 +388,15 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                         placeholder={isListening ? "🎙️ Aufnahme läuft..." : "Optional: Hinweis tippen oder sprechen... (z.B. 'Gardine nur halb hoch', 'Teppich rund')"}
                                         value={textHint}
                                         onChange={(e) => setTextHint(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === 'Enter' && !e.shiftKey) {
-                                                e.preventDefault();
-                                                if (isGenerationEnabled) {
-                                                    handleGenerate();
-                                                }
-                                            }
-                                        }}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (isGenerationEnabled) { handleGenerate(); }}}}
                                         className="w-full h-24 rounded-xl border border-gray-300 p-3 text-sm focus:ring-2 focus:ring-[#FF954F] focus:border-[#FF954F] transition-shadow resize-none flex-grow"
                                     />
-                                    {isSpeechRecognitionSupported && (
-                                        <SpeechButton 
-                                            onStart={startSpeechToText}
-                                            onStop={stopSpeechToText}
-                                            isListening={isListening}
-                                        />
-                                    )}
+                                    {isSpeechRecognitionSupported && (<SpeechButton onStart={startSpeechToText} onStop={stopSpeechToText} isListening={isListening} />)}
                                </div>
-                               {isListening && (
-                                    <p className="text-sm text-gray-600 italic mt-2 h-5">
-                                        Zuhören aktiv...
-                                    </p>
-                               )}
+                               {isListening && (<p className="text-sm text-gray-600 italic mt-2 h-5">Zuhören aktiv...</p>)}
                             </form>
                         </div>
-                        <button 
-                            onClick={handleGenerate} 
-                            disabled={!isGenerationEnabled || isLoading}
-                            className={`${actionButtonClasses} w-full max-w-sm mt-2 text-lg bg-[#FF954F] hover:bg-[#CC5200] focus:ring-[#FF954F] disabled:bg-[#C8B6A6] disabled:cursor-not-allowed`}
-                        >
-                            Bild generieren
-                        </button>
+                        <button onClick={handleGenerate} disabled={!isGenerationEnabled || isLoading} className={`${actionButtonClasses} w-full max-w-sm mt-2 text-lg bg-[#FF954F] hover:bg-[#CC5200] focus:ring-[#FF954F] disabled:bg-[#C8B6A6] disabled:cursor-not-allowed`}>Bild generieren</button>
                     </div>
                 </div>
             </section>
@@ -495,24 +404,11 @@ const Workspace: React.FC<WorkspaceProps> = ({
         
         {pendingVariant && (
              <section className="mt-12 animate-fade-in">
-                 <div className="text-center mb-6">
-                    <h2 className="text-2xl font-semibold text-[#532418]">Neuer Vorschlag</h2>
-                    <p className="text-md text-[#67534F]/90">Was möchten Sie mit dieser neuer Variante tun?</p>
-                </div>
-                 <div className="max-w-md mx-auto">
-                    <VariantCard 
-                        imageUrl={pendingVariant.imageUrl}
-                        title={`Vorschlag für: ${pendingVariant.preset}`}
-                        isLarge={true}
-                    />
-                 </div>
+                 <div className="text-center mb-6"><h2 className="text-2xl font-semibold text-[#532418]">Neuer Vorschlag</h2><p className="text-md text-[#67534F]/90">Was möchten Sie mit dieser neuer Variante tun?</p></div>
+                 <div className="max-w-md mx-auto"><VariantCard imageUrl={pendingVariant.imageUrl} title={`Vorschlag für: ${pendingVariant.preset}`} isLarge={true} /></div>
                  <div className="flex justify-center items-center gap-4 mt-6">
-                     <button onClick={handleDiscardVariant} className={`${actionButtonClasses} bg-gray-500 hover:bg-gray-600 focus:ring-gray-400`}>
-                        <DiscardIcon /> Verwerfen
-                     </button>
-                     <button onClick={handleSaveVariant} className={`${actionButtonClasses} bg-green-600 hover:bg-green-700 focus:ring-green-500`}>
-                        <SaveIcon /> In Galerie speichern
-                     </button>
+                     <button onClick={handleDiscardVariant} className={`${actionButtonClasses} bg-gray-500 hover:bg-gray-600 focus:ring-gray-400`}><DiscardIcon /> Verwerfen</button>
+                     <button onClick={handleSaveVariant} className={`${actionButtonClasses} bg-green-600 hover:bg-green-700 focus:ring-green-500`}><SaveIcon /> In Galerie speichern</button>
                  </div>
              </section>
         )}
@@ -521,21 +417,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
             <div className="mt-12 p-6 bg-green-50 border-2 border-dashed border-green-300 rounded-xl text-center animate-fade-in">
                 <h3 className="text-xl font-semibold text-green-800">Variante gespeichert!</h3>
                 <p className="text-green-700 mt-2">Sie können nun ein weiteres Musterfoto hochladen, um neue Ideen für denselben Raum zu visualisieren.</p>
-                <button onClick={handleNextPattern} className="mt-4 px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all transform hover:scale-105 shadow-md flex items-center justify-center gap-2 mx-auto">
-                   Nächstes Musterfoto <NextIcon />
-                </button>
+                <button onClick={handleNextPattern} className="mt-4 px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all transform hover:scale-105 shadow-md flex items-center justify-center gap-2 mx-auto">Nächstes Musterfoto <NextIcon /></button>
             </div>
         )}
 
         {session && session.variants.length > 0 && (
           <section className="mt-12 animate-fade-in">
-             <Gallery 
-                variants={session.variants} 
-                onVariantSelect={setModalVariant}
-                onEmailAll={handleEmailGallery}
-                onDownloadAll={handleDownloadGallery}
-                onDeleteAll={handleDeleteGallery}
-            />
+             <Gallery variants={session.variants} onVariantSelect={setModalVariant} onEmailAll={handleEmailGallery} onDownloadAll={handleDownloadGallery} onDeleteAll={handleDeleteGallery} />
           </section>
         )}
       </main>
