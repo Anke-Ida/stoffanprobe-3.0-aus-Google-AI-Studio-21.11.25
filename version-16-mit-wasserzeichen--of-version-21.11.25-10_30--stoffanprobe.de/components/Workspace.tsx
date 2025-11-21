@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Session, Variant, PresetType, CustomerData, ConsentData, RALColor, VisualizationMode } from '../types';
 import { saveSession } from '../services/dbService';
-import { generateVisualization } from '../services/geminiService';
+// WICHTIG: Alter Service raus, neuer rein!
+import { AIService } from '../services/AIService'; 
 import ImageUploader from './ImageUploader';
 import Gallery from './Gallery';
 import PresetButtons from './PresetButtons';
@@ -148,14 +149,39 @@ const Workspace: React.FC<WorkspaceProps> = ({
     setShowNextStep(false);
 
     try {
-        const newVariantImage = await generateVisualization({
-            roomImage: session.originalImage,
-            mode: visualizationMode,
-            patternImage: session.patternImage,
-            preset: selectedPreset,
-            wallColor: session.wallColor,
-            textHint: textHint
-        });
+        // 1. Prompt Bauen für Flux / Fal.ai
+        let prompt = "Ein fotorealistisches Bild eines Innenraums. ";
+        
+        if (visualizationMode === 'pattern' && selectedPreset) {
+            prompt += `Ersetze den Stoff oder das Material von ${selectedPreset} durch ein neues Design. Das neue Design soll hochwertig und nahtlos integriert aussehen. `;
+        }
+
+        if (visualizationMode === 'creativeWallColor' && session.wallColor) {
+            prompt += `Streiche die Wände in der Farbe ${session.wallColor.name} (Farbcode ${session.wallColor.code}). Achte auf korrekte Licht- und Schattenverhältnisse an der Wand. `;
+        }
+
+        if (textHint) {
+            prompt += `Zusätzliche Anweisungen: ${textHint}. `;
+        }
+        
+        prompt += "Hohe Qualität, 4k, Architekturfotografie.";
+
+        // 2. Aufruf des neuen AIService (Fal.ai)
+        // HINWEIS: Da wir aktuell noch keine "Maske" zeichnen, nutzen wir das Originalbild
+        // Flux wird versuchen, basierend auf dem Prompt das Bild zu verändern.
+        // Für perfekte Ergebnisse müssten wir später noch eine Maskierungs-Funktion einbauen.
+        const result = await AIService.generateImage(
+            prompt,
+            session.originalImage,
+            session.originalImage // Hier nutzen wir vorerst das Originalbild als Referenz für die Maske (automatisches Inpainting)
+        );
+        
+        // Fal.ai gibt eine Liste von Bildern zurück
+        const newVariantImage = result.images && result.images.length > 0 ? result.images[0].url : null;
+
+        if (!newVariantImage) {
+            throw new Error("Kein Bild von der KI erhalten.");
+        }
         
         const presetForVariant: Variant['preset'] = visualizationMode === 'pattern' && selectedPreset ? selectedPreset : 'Wandfarbe';
 
@@ -228,11 +254,13 @@ const Workspace: React.FC<WorkspaceProps> = ({
           if (!folder) throw new Error("Konnte keinen ZIP-Ordner erstellen.");
 
           for (const variant of session.variants) {
-              const base64Data = variant.imageUrl.split(',')[1];
-              const mimeType = variant.imageUrl.match(/:(.*?);/)?.[1] ?? 'image/png';
-              const extension = mimeType.split('/')[1]?.split('+')[0] ?? 'png';
+              // Fal.ai URLs sind normale Links, wir müssen sie fetchen um sie zu zippen
+              const response = await fetch(variant.imageUrl);
+              const blob = await response.blob();
+              
+              const extension = blob.type.split('/')[1] || 'png';
               const filename = `variante-${variant.preset}-${variant.id.substring(0, 4)}.${extension}`;
-              folder.file(filename, base64Data, { base64: true });
+              folder.file(filename, blob);
           }
           
           const content = await zip.generateAsync({ type: 'blob' });
@@ -329,7 +357,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                             <p className="font-semibold text-[#532418]">{session.wallColor.code}</p>
                             <p className="text-sm text-gray-700">{session.wallColor.name}</p>
                           </div>
-                      
+                       
                           <div className="flex items-center gap-4">
                              <button
                               className="text-sm font-medium text-[#532418] hover:text-[#FF954F] flex items-center gap-1 transition-colors"
@@ -367,7 +395,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                       if (e.key === 'Enter' && !e.shiftKey) {
                                           e.preventDefault();
                                           if (isGenerationEnabled) {
-                                            handleGenerate();
+                                              handleGenerate();
                                           }
                                       }
                                   }}
@@ -436,7 +464,7 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                             if (e.key === 'Enter' && !e.shiftKey) {
                                                 e.preventDefault();
                                                 if (isGenerationEnabled) {
-                                                  handleGenerate();
+                                                    handleGenerate();
                                                 }
                                             }
                                         }}
@@ -448,75 +476,3 @@ const Workspace: React.FC<WorkspaceProps> = ({
                                             onStop={stopSpeechToText}
                                             isListening={isListening}
                                         />
-                                    )}
-                               </div>
-                               {isListening && (
-                                    <p className="text-sm text-gray-600 italic mt-2 h-5">
-                                        Zuhören aktiv...
-                                    </p>
-                               )}
-                            </form>
-                        </div>
-                        <button 
-                            onClick={handleGenerate} 
-                            disabled={!isGenerationEnabled || isLoading}
-                            className={`${actionButtonClasses} w-full max-w-sm mt-2 text-lg bg-[#FF954F] hover:bg-[#CC5200] focus:ring-[#FF954F] disabled:bg-[#C8B6A6] disabled:cursor-not-allowed`}
-                        >
-                            Bild generieren
-                        </button>
-                    </div>
-                </div>
-            </section>
-        )}
-        
-        {pendingVariant && (
-             <section className="mt-12 animate-fade-in">
-                 <div className="text-center mb-6">
-                    <h2 className="text-2xl font-semibold text-[#532418]">Neuer Vorschlag</h2>
-                    <p className="text-md text-[#67534F]/90">Was möchten Sie mit dieser neuer Variante tun?</p>
-                </div>
-                 <div className="max-w-md mx-auto">
-                    <VariantCard 
-                        imageUrl={pendingVariant.imageUrl}
-                        title={`Vorschlag für: ${pendingVariant.preset}`}
-                        isLarge={true}
-                    />
-                 </div>
-                 <div className="flex justify-center items-center gap-4 mt-6">
-                     <button onClick={handleDiscardVariant} className={`${actionButtonClasses} bg-gray-500 hover:bg-gray-600 focus:ring-gray-400`}>
-                        <DiscardIcon /> Verwerfen
-                     </button>
-                     <button onClick={handleSaveVariant} className={`${actionButtonClasses} bg-green-600 hover:bg-green-700 focus:ring-green-500`}>
-                        <SaveIcon /> In Galerie speichern
-                     </button>
-                 </div>
-             </section>
-        )}
-
-        {showNextStep && (
-            <div className="mt-12 p-6 bg-green-50 border-2 border-dashed border-green-300 rounded-xl text-center animate-fade-in">
-                <h3 className="text-xl font-semibold text-green-800">Variante gespeichert!</h3>
-                <p className="text-green-700 mt-2">Sie können nun ein weiteres Musterfoto hochladen, um neue Ideen für denselben Raum zu visualisieren.</p>
-                <button onClick={handleNextPattern} className="mt-4 px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition-all transform hover:scale-105 shadow-md flex items-center justify-center gap-2 mx-auto">
-                   Nächstes Musterfoto <NextIcon />
-                </button>
-            </div>
-        )}
-
-        {session && session.variants.length > 0 && (
-          <section className="mt-12 animate-fade-in">
-             <Gallery 
-                variants={session.variants} 
-                onVariantSelect={setModalVariant}
-                onEmailAll={handleEmailGallery}
-                onDownloadAll={handleDownloadGallery}
-                onDeleteAll={handleDeleteGallery}
-            />
-          </section>
-        )}
-      </main>
-    </>
-  );
-};
-
-export default Workspace;
