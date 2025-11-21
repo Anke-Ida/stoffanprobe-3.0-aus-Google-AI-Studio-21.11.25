@@ -1,3 +1,4 @@
+// Vercel Neustart Fix
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Session, Variant, PresetType, CustomerData, ConsentData, RALColor, VisualizationMode } from '../types';
 import { saveSession } from '../services/dbService';
