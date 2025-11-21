@@ -1,0 +1,8 @@
+{
+  "name": "Version 16 mit Wasserzeichen  of Version 21.11.25 10:30  stoffanprobe.de",
+  "description": "An AI-powered visualization tool for interior designers to instantly showcase fabrics, wallpapers, and carpets in a client's actual room.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
